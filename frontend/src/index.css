@@ -1,0 +1,223 @@
+/* src/index.css (Tailwind + global + image fade-in + logo) */
+
+/* Tailwind must be first */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ----------------- Global accessibility & small resets ----------------- */
+
+/* Prevent mobile tap highlight flash */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Remove default outline for mouse/touch, keep for keyboard via :focus-visible */
+:focus {
+  outline: none;
+}
+
+/* Show a clear accessible ring only for keyboard users */
+:focus-visible {
+  outline: 3px solid rgba(217, 119, 6, 0.18); /* amber-ish */
+  outline-offset: 3px;
+  border-radius: 0.375rem;
+}
+
+/* Small transitions for interactive elements only (avoid global * transition) */
+button, a, input, .logo-wrap {
+  transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+  will-change: transform, box-shadow;
+}
+
+/* nav pseudo-elements safety (avoid accidental small squares) */
+nav *::before,
+nav *::after {
+  content: none !important;
+}
+
+/* Small avatar utility for header usage (used when avatar image missing) */
+.avatar-sm {
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  object-fit: cover;
+}
+
+/* Product fallback images */
+img[src="/no-image.jpg"],
+img[src="/placeholder.png"] {
+  object-fit: contain;
+}
+
+/* Remove focus outline on explicitly non-interactive elements */
+[tabindex="-1"] { outline: none; }
+
+
+/* ---------- image fade-in / placeholder ---------- */
+
+/* container that reserves aspect ratio (use on wrappers) */
+.img-figure {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background-color: #f3e8d6; /* soft amber-ish placeholder */
+  border-radius: 8px;
+}
+
+/* The actual <img> which will fade in */
+.fade-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;      /* or object-contain for product shots you want letterboxed */
+  opacity: 0;
+  transition: opacity 260ms ease, transform 260ms ease;
+  transform: translateY(-4px);
+}
+
+/* when loaded we add .loaded to img (or parent), making it visible */
+.fade-img.loaded {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* fallback placeholder element (keeps same layout) */
+.img-placeholder {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background-position: center;
+  background-size: cover;
+  filter: blur(2px);
+  opacity: 1;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+
+/* hide placeholder once real image is loaded */
+.img-figure.loaded .img-placeholder { opacity: 0; }
+
+
+/* Prevent layout jump for product thumbnails (modern browsers) */
+.product-thumb {
+  aspect-ratio: 1 / 1; /* square preview */
+  width: 100%;
+  display: block;
+  overflow: hidden;
+}
+
+
+/* ----------------- Logo wrapper + image (prevents blink & layout shift) ----------------- */
+
+/* wrapper reserves exact space & shows amber placeholder so no white flash */
+.logo-wrap {
+  width: 56px;
+  height: 56px;
+  background-color: rgba(245, 158, 11, 0.06); /* subtle amber tint */
+  display: inline-block;
+  overflow: hidden;
+  border-radius: 9999px; /* circular */
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  border: 2px solid rgba(255,255,255,0.95);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  will-change: transform, box-shadow;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* image inside wrapper: keep full size and invisible until loaded */
+.logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* preserve transparent edges and show full logo */
+  display: block;
+  opacity: 0;
+  transform: scale(0.98) translateY(-2px);
+  transition: opacity 220ms ease, transform 220ms ease;
+  will-change: opacity, transform;
+}
+
+/* when wrapper has loaded class, animate image in */
+.logo-wrap.logo-loaded .logo-img {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* slight hover lift for desktop */
+.logo-wrap:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.14);
+}
+
+
+/* ----------------- Avatar fallback (first-letter badge) ----------------- */
+
+.avatar-initial {
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: white;
+  font-size: 14px;
+  /* gradient background matching header */
+  background: linear-gradient(135deg, rgba(255,178,13,1) 0%, rgba(236,72,153,1) 100%);
+  border: 2px solid rgba(255,255,255,0.9);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.12);
+}
+
+/* larger on larger screens */
+@media (min-width: 768px) {
+  .avatar-initial { width: 36px; height: 36px; font-size: 15px; }
+}
+
+/* Ensure avatar image has same look & border */
+img.h-8.w-8.rounded-full {
+  object-fit: cover;
+  border-radius: 9999px;
+  border: 2px solid rgba(255,255,255,0.9);
+}
+
+
+/* ----------------- header/brand visual tuning ----------------- */
+
+/* Optional: brand title styles (if you add Playfair Display in index.html it will be used) */
+.brand-title {
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  text-shadow: 0 2px 0 rgba(0,0,0,0.12), 0 6px 24px rgba(0,0,0,0.06);
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+/* Make nav links slightly larger on desktop for better tap target */
+nav a {
+  font-size: 0.95rem;
+}
+
+/* search box - subtle glass look to sit on gradient */
+input[type="search"] {
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(4px);
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,0.22);
+}
+
+/* small responsive tweaks for header on tiny screens */
+@media (max-width: 640px) {
+  .brand-title { font-size: 1.25rem; } /* smaller on very small screens */
+  nav a { font-size: 0.9rem; }
+}
+
+/* ----------------- Misc small improvements ----------------- */
+
+/* Improve contrast for inline SVG icons */
+svg[role="img"], svg[aria-hidden="true"] {
+  shape-rendering: geometricPrecision;
+}
+
+/* End of file */
