@@ -19,6 +19,7 @@ const DEFAULT_ORIGINS = [
   "http://localhost:5174",
   "http://localhost:5175",
   "http://localhost:3000",
+  'https://golden-aura-ip1e.vercel.app',
 ];
 
 const EXTRA_ORIGIN = (process.env.FRONTEND_URL || "").trim();
