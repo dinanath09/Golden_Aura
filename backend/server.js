@@ -19,13 +19,20 @@ const DEFAULT_ORIGINS = [
   "http://localhost:5174",
   "http://localhost:5175",
   "http://localhost:3000",
-  'https://golden-aura-ip1e.vercel.app',
+  "https://golden-aura-ip1e.vercel.app", // keep hard-coded prod if you like
 ];
 
-const EXTRA_ORIGIN = (process.env.FRONTEND_URL || "").trim();
-const ALLOWED_ORIGINS = EXTRA_ORIGIN
-  ? Array.from(new Set([...DEFAULT_ORIGINS, EXTRA_ORIGIN]))
-  : DEFAULT_ORIGINS;
+// FRONTEND_URL can be comma-separated list of extra origins
+// e.g. "https://golden-aura-ip1e.vercel.app,https://golden-aura-ip1e-git-main-dinanaths-projects.vercel.app"
+const EXTRA_ORIGINS_RAW = process.env.FRONTEND_URL || "";
+const EXTRA_ORIGINS = EXTRA_ORIGINS_RAW
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+const ALLOWED_ORIGINS = Array.from(
+  new Set([...DEFAULT_ORIGINS, ...EXTRA_ORIGINS])
+);
 
 /* ---------------------- Middleware ----------------------- */
 app.use(express.json({ limit: "5mb" }));
