@@ -11,10 +11,30 @@ const heroBg = new URL("../assets/hero-bottle.jpeg", import.meta.url).href;
 const RAW = (import.meta.env.VITE_API_URL || "http://localhost:5000").trim();
 const API_BASE = RAW.replace(/\/+$/, "");
 
-function buildImageUrl(url) {
-  if (!url) return "/no-image.jpg";
-  if (/^https?:\/\//i.test(url)) return url;
-  return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
+// --- FIXED: handles localhost URLs, absolute URLs and relative paths ---
+function buildImageUrl(raw) {
+  if (!raw) return "/no-image.jpg";
+
+  // If it's an absolute URL
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const u = new URL(raw);
+
+      // If it points to localhost (saved from dev), replace origin with API_BASE
+      if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
+        return `${API_BASE}${u.pathname}`;
+      }
+
+      // Already a correct external URL (e.g. Cloudinary)
+      return raw;
+    } catch {
+      // fall through and treat as relative if parsing fails
+    }
+  }
+
+  // Relative path from DB: "uploads/..." or "/uploads/..."
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  return `${API_BASE}${path}`;
 }
 
 export default function Home() {
