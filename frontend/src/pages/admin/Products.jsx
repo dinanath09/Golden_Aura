@@ -225,13 +225,19 @@ export default function AdminProducts() {
               <option>Perfume Candle</option>
             </select>
           </div>
+
+          {/* ✅ Category dropdown: Unisex / Male / Female */}
           <div>
             <label className="text-sm font-medium">Category</label>
-            <input
+            <select
               className="border rounded px-3 py-2 w-full"
               value={form.category}
               onChange={(e) => setField("category", e.target.value)}
-            />
+            >
+              <option value="Unisex">Unisex</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
           </div>
         </div>
 

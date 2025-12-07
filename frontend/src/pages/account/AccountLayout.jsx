@@ -69,17 +69,6 @@ export default function AccountLayout() {
                 Orders
               </NavLink>
 
-              <NavLink
-                to="/account/wishlist"
-                className={({ isActive }) =>
-                  `${linkBase} ${
-                    isActive ? activeClasses : inactiveClasses
-                  }`
-                }
-              >
-                Wishlist
-              </NavLink>
-
               {isAdmin && (
                 <>
                   <div className="pt-3 border-t mt-3 text-xs uppercase tracking-wide text-zinc-400">

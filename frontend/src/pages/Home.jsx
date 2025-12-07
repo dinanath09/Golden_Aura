@@ -1,31 +1,55 @@
 // src/pages/Home.jsx
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
-// images used on this page
 import aboutBottle from "../assets/about-bottle.JPG";
 
-// hero background as CSS url
 const heroBg = new URL("../assets/hero-bottle.jpeg", import.meta.url).href;
+
+const RAW = (import.meta.env.VITE_API_URL || "http://localhost:5000").trim();
+const API_BASE = RAW.replace(/\/+$/, "");
+
+function buildImageUrl(url) {
+  if (!url) return "/no-image.jpg";
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
+}
 
 export default function Home() {
   const [featured, setFeatured] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     (async () => {
       try {
+        setLoading(true);
+        setError("");
+
         const { data } = await api.get("/products?sort=newest");
-        setFeatured((data || []).slice(0, 4));
-      } catch {
+
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.products)
+          ? data.products
+          : [];
+
+        setFeatured(list.slice(0, 4));
+      } catch (err) {
+        console.error("Error loading featured products", err);
+        setError("Failed to load featured products.");
         setFeatured([]);
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
 
   return (
     <div className="space-y-16">
-      {/* ------------------- HERO (full-width bg, light overlay) ------------------- */}
+      {/* HERO SECTION */}
       <section className="relative w-full">
         <div
           className="absolute inset-0 w-full h-full bg-cover bg-center"
@@ -63,24 +87,37 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ------------------- FEATURED PRODUCTS ------------------- */}
+      {/* FEATURED PRODUCTS */}
       <Section title="Featured Products">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {featured.map((p) => (
-            <ProductMini key={p._id} p={p} />
-          ))}
-          {!featured.length && (
-            <>
-              <SkeletonProduct />
-              <SkeletonProduct />
-              <SkeletonProduct />
-              <SkeletonProduct />
-            </>
-          )}
-        </div>
+        {loading && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <SkeletonProduct />
+            <SkeletonProduct />
+            <SkeletonProduct />
+            <SkeletonProduct />
+          </div>
+        )}
+
+        {!loading && error && (
+          <p className="text-sm text-red-500">{error}</p>
+        )}
+
+        {!loading && !error && !featured.length && (
+          <p className="text-sm text-zinc-500">
+            No featured products available yet.
+          </p>
+        )}
+
+        {!loading && !error && featured.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {featured.map((p) => (
+              <ProductMini key={p._id} p={p} />
+            ))}
+          </div>
+        )}
       </Section>
 
-      {/* ------------------- ABOUT THE BRAND ------------------- */}
+      {/* ABOUT SECTION */}
       <section className="rounded-[28px] border bg-[#f7efe7] p-6 sm:p-10">
         <div className="grid lg:grid-cols-[360px_1fr] items-center gap-8">
           <div className="rounded-xl overflow-hidden border bg-white flex items-center justify-center">
@@ -109,8 +146,7 @@ export default function Home() {
   );
 }
 
-/* ----------------- small UI bits ----------------- */
-
+/* --- Reusable Section Wrapper --- */
 function Section({ title, children }) {
   return (
     <section className="rounded-[24px] border bg-white p-6 sm:p-8">
@@ -120,50 +156,164 @@ function Section({ title, children }) {
   );
 }
 
+/* --- Product Card With Wishlist + Auth-aware buttons --- */
 function ProductMini({ p }) {
+  const [wishLoading, setWishLoading] = useState(false);
+  const [inWishlist, setInWishlist] = useState(false);
+
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isLoggedIn = !!user;
+
+  const imgUrl = buildImageUrl(p.images?.[0]?.url);
+  const link = `/products/${p._id}`;
+
+  /* LOAD WISHLIST STATUS ON PAGE LOAD */
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get("/wishlist");
+        const ids = (data?.products || []).map((x) => x._id);
+        setInWishlist(ids.includes(p._id));
+      } catch (err) {
+        console.error("Wishlist preload error", err);
+      }
+    })();
+  }, [p._id]);
+
+  /* TOGGLE WISHLIST */
+  const toggleWishlist = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (wishLoading) return;
+
+    try {
+      setWishLoading(true);
+
+      if (inWishlist) {
+        const res = await api.delete(`/wishlist/${p._id}`);
+        console.log("Removed from wishlist:", res?.data);
+        setInWishlist(false);
+      } else {
+        const res = await api.post("/wishlist", { productId: p._id });
+        console.log("Added to wishlist:", res?.data);
+        setInWishlist(true);
+      }
+    } catch (err) {
+      console.error("Wishlist toggle error", err);
+      if (err?.response?.status === 401) {
+        alert("Please log in to use wishlist.");
+      } else {
+        alert(
+          err?.response?.data?.message ||
+            err?.message ||
+            "Could not update wishlist"
+        );
+      }
+    } finally {
+      setWishLoading(false);
+    }
+  };
+
+  /* ADD TO CART (login required) */
+  const handleAddToCart = (e) => {
+    e.preventDefault();
+
+    const target = link; // /products/:id
+
+    if (!isLoggedIn) {
+      const redirect = encodeURIComponent(target);
+      navigate(`/login?redirect=${redirect}`);
+      return;
+    }
+
+    navigate(target);
+  };
+
+  /* BUY NOW (login required) */
+  const handleBuyNow = (e) => {
+    e.preventDefault();
+
+    const target = `${link}?buy=1`;
+
+    if (!isLoggedIn) {
+      const redirect = encodeURIComponent(target);
+      navigate(`/login?redirect=${redirect}`);
+      return;
+    }
+
+    navigate(target);
+  };
+
   return (
-    <div className="rounded-xl border bg-white overflow-hidden">
-      <Link to={`/products/${p.slug}`} className="block">
-        <div className="aspect-[4/3] w-full bg-[#f4efe9] flex items-center justify-center">
-          {p.images?.[0]?.url ? (
+    <div className="rounded-2xl border bg-white shadow-sm hover:shadow-md transition overflow-hidden">
+      <div className="relative">
+        <Link to={link}>
+          <div className="aspect-[4/5] bg-[#f7f5f1] overflow-hidden">
             <img
-              src={p.images[0].url}
+              src={imgUrl}
               alt={p.title}
-              className="h-[75%] w-auto object-contain"
+              className="w-full h-full object-cover"
             />
-          ) : (
-            <div className="text-zinc-400">No Image</div>
-          )}
-        </div>
-      </Link>
+          </div>
+        </Link>
+
+        <button
+          onClick={toggleWishlist}
+          className="absolute top-3 right-3 bg-white/90 rounded-full p-1.5 shadow-sm hover:bg-white"
+          aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+          disabled={wishLoading}
+        >
+          <span className={inWishlist ? "text-red-500" : "text-zinc-400"}>
+            {inWishlist ? "♥" : "♡"}
+          </span>
+        </button>
+      </div>
 
       <div className="p-4 space-y-1">
-        <Link to={`/products/${p.slug}`} className="font-medium hover:underline">
+        <Link
+          to={link}
+          className="text-lg font-medium hover:underline inline-block"
+        >
           {p.title}
         </Link>
-        <div className="text-sm text-zinc-500">{p.category || "Unisex"}</div>
-        <div className="text-sm font-semibold">₹{p.price}</div>
-        <div className="pt-2">
-          <Link
-            to={`/products/${p.slug}`}
-            className="px-3 py-1.5 rounded-md border hover:bg-zinc-50 text-sm"
+
+        <div className="text-sm text-zinc-600">
+          {p.type} · {p.category}
+        </div>
+
+        <div className="text-lg font-semibold mt-1">₹{p.price}</div>
+
+        <div className="flex gap-2 mt-3">
+          <button
+            onClick={handleAddToCart}
+            className="flex-1 px-3 py-2 rounded-md bg-black text-white text-sm text-center hover:bg-zinc-900"
           >
             Add to Cart
-          </Link>
+          </button>
+
+          <button
+            onClick={handleBuyNow}
+            className="flex-1 px-3 py-2 rounded-md border text-sm text-center hover:bg-zinc-50"
+          >
+            Buy Now
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
+/* --- Skeleton Loader --- */
 function SkeletonProduct() {
   return (
-    <div className="rounded-xl border bg-white overflow-hidden animate-pulse">
-      <div className="aspect-[4/3] w-full bg-zinc-100" />
+    <div className="rounded-2xl border bg-white overflow-hidden animate-pulse">
+      <div className="aspect-[4/5] w-full bg-zinc-200" />
       <div className="p-4 space-y-2">
-        <div className="h-4 bg-zinc-100 rounded w-2/3" />
-        <div className="h-3 bg-zinc-100 rounded w-1/3" />
-        <div className="h-4 bg-zinc-100 rounded w-1/4" />
+        <div className="h-4 bg-zinc-200 rounded w-3/4" />
+        <div className="h-3 bg-zinc-200 rounded w-1/2" />
+        <div className="h-4 bg-zinc-200 rounded w-1/3" />
+        <div className="h-8 bg-zinc-200 rounded w-full mt-2" />
       </div>
     </div>
   );

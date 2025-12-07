@@ -1,18 +1,24 @@
-// backend/routes/wishlist.js
-const router = require("express").Router();
-const { protect } = require("../middleware/auth");
-const WL = require("../controllers/wishlistController");
+// backend/models/Wishlist.js
+const mongoose = require("mongoose");
 
-// check if product is in wishlist
-router.get("/check/:id", protect, WL.check);
+const wishlistSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
 
-// get full wishlist (populated)
-router.get("/", protect, WL.getWishlist);
+    product: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Product",
+      required: true,
+    },
+  },
+  { timestamps: true }
+);
 
-// add to wishlist (body: { productId })
-router.post("/", protect, WL.addToWishlist);
+// prevent same product twice for same user
+wishlistSchema.index({ user: 1, product: 1 }, { unique: true });
 
-// remove from wishlist (param or body)
-router.delete("/:productId", protect, WL.removeFromWishlist);
-
-module.exports = router;
+module.exports = mongoose.model("Wishlist", wishlistSchema);

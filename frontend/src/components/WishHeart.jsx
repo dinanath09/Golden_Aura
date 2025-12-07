@@ -1,46 +1,50 @@
 // frontend/src/components/WishHeart.jsx
 import { useEffect, useState } from "react";
 import { toggleWishlist, checkWishlist } from "../utils/wishlist";
-import { useAuth } from "../context/AuthContext"; // if you have this
+import { useAuth } from "../context/AuthContext";
 
-export default function WishHeart({ productId, tokenProp }) {
-  // tokenProp allows explicit override; otherwise try context; otherwise localStorage fallback
-  const auth = useAuth?.() || null; // safe if hook missing
-  const token = tokenProp || auth?.token || localStorage.getItem("token") || null;
+export default function WishHeart({ productId }) {
+  const { token } = useAuth(); // <-- FIXED: call correctly
+  const realToken = token || localStorage.getItem("token") || null;
 
   const [wished, setWished] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
+    let alive = true;
+
     (async () => {
       try {
-        if (!token) {
-          if (mounted) setWished(false);
+        if (!realToken) {
+          if (alive) setWished(false);
           return;
         }
-        const isW = await checkWishlist(productId, token);
-        if (mounted) setWished(isW);
-      } catch (e) {
-        console.error("checkWishlist failed", e);
+
+        const isWished = await checkWishlist(productId, realToken);
+        if (alive) setWished(isWished);
+      } catch (err) {
+        console.error("Wishlist load error:", err);
       }
     })();
-    return () => { mounted = false; };
-  }, [productId, token]);
 
-  const onClick = async (e) => {
+    return () => (alive = false);
+  }, [productId, realToken]);
+
+  const handleClick = async (e) => {
     e.preventDefault();
-    if (!token) {
-      alert("Please login to add to wishlist");
+
+    if (!realToken) {
+      alert("Please login to use wishlist.");
       return;
     }
+
     setBusy(true);
     try {
-      const newState = await toggleWishlist(productId, token, wished);
+      const newState = await toggleWishlist(productId, realToken, wished);
       setWished(newState);
     } catch (err) {
-      console.error(err);
-      alert(err?.response?.data?.message || err.message || "Wishlist failed");
+      console.error("Wishlist toggle error:", err);
+      alert(err?.response?.data?.message || "Wishlist action failed");
     } finally {
       setBusy(false);
     }
@@ -48,13 +52,14 @@ export default function WishHeart({ productId, tokenProp }) {
 
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       disabled={busy}
-      aria-pressed={wished}
-      title={wished ? "Remove from wishlist" : "Add to wishlist"}
-      className="px-2 py-1"
+      aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
+      className="absolute top-3 right-3 bg-white/80 rounded-full p-2 shadow"
     >
-      <span style={{ fontSize: 18 }}>{wished ? "♥" : "♡"}</span>
+      <span className={wished ? "text-red-500" : "text-gray-400"} style={{ fontSize: 20 }}>
+        {wished ? "♥" : "♡"}
+      </span>
     </button>
   );
 }

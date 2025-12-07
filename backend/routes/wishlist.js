@@ -1,22 +1,23 @@
-// backend/routes/wishlist.js
 const express = require("express");
 const router = express.Router();
+
 const { protect } = require("../middleware/auth");
-const WL = require("../controllers/wishlistController");
+const {
+  getWishlist,
+  addToWishlist,
+  removeFromWishlist,
+} = require("../controllers/wishlistController");
 
-// GET /api/wishlist              -> get full wishlist (populated)
-router.get("/", protect, WL.getWishlist);
+// all wishlist endpoints require login
+router.use(protect);
 
-// GET /api/wishlist/check/:productId -> check single product wished (returns { wished: true/false })
-router.get("/check/:productId", protect, WL.check);
+// GET /api/wishlist
+router.get("/", getWishlist);
 
-// POST /api/wishlist             -> add to wishlist { productId }
-router.post("/", protect, WL.add);
+// POST /api/wishlist  { productId }
+router.post("/", addToWishlist);
 
-// DELETE /api/wishlist/:productId -> remove by param
-router.delete("/:productId", protect, WL.remove);
-
-// also allow DELETE /api/wishlist { productId } fallback
-router.delete("/", protect, WL.remove);
+// DELETE /api/wishlist/:productId
+router.delete("/:productId", removeFromWishlist);
 
 module.exports = router;

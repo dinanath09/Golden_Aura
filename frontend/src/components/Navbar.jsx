@@ -31,12 +31,10 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     try {
-      // logout might be async
       await logout?.();
     } catch (err) {
       console.error("Logout failed:", err);
     } finally {
-      // always navigate to login after logout
       try {
         navigate("/login", { replace: true });
       } catch {}
@@ -78,12 +76,13 @@ export default function Navbar() {
       <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-pink-500 text-white shadow-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-16">
-
             {/* LEFT: Logo + Menu */}
             <div className="flex items-center gap-6">
               <Link to="/" className="flex items-center gap-3 select-none">
                 <div
-                  className={`logo-wrap rounded-full overflow-hidden border-2 border-white/90 shadow-sm ${logoLoaded ? "logo-loaded" : ""}`}
+                  className={`logo-wrap rounded-full overflow-hidden border-2 border-white/90 shadow-sm ${
+                    logoLoaded ? "logo-loaded" : ""
+                  }`}
                 >
                   <img
                     src={logo}
@@ -164,7 +163,9 @@ export default function Navbar() {
                 <NavLink
                   to="/about"
                   className={({ isActive }) =>
-                    `px-3 py-2 rounded-md text-sm ${isActive ? "text-white" : "text-white/95 hover:bg-white/10"}`
+                    `px-3 py-2 rounded-md text-sm ${
+                      isActive ? "text-white" : "text-white/95 hover:bg-white/10"
+                    }`
                   }
                 >
                   About
@@ -244,13 +245,7 @@ export default function Navbar() {
                       Orders
                     </Link>
 
-                    <Link
-                      to="/account/wishlist"
-                      onClick={() => setMenuOpen(false)}
-                      className="block px-4 py-2 hover:bg-zinc-50"
-                    >
-                      Wishlist
-                    </Link>
+                    {/* Wishlist item removed */}
 
                     <button
                       onClick={handleLogout}

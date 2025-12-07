@@ -13,6 +13,16 @@ import { useAuth } from "../context/AuthContext";
  * - on successful payment calls /api/payments/verify with payment fields + delivery + items
  */
 
+// ------- IMAGE URL HELPER (same logic as Home.jsx) -------
+const RAW = (import.meta.env.VITE_API_URL || "http://localhost:5000").trim();
+const API_BASE = RAW.replace(/\/+$/, "");
+
+function buildImageUrl(url) {
+  if (!url) return "/no-image.jpg";
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
+}
+
 const loadRazorpayScript = () =>
   new Promise((resolve) => {
     if (document.getElementById("razorpay-script")) return resolve(true);
@@ -197,30 +207,39 @@ export default function Checkout() {
           <h2 className="text-xl font-semibold mb-4">Review your items</h2>
 
           <ul className="divide-y">
-            {items.map((it) => (
-              <li
-                key={it.productId ?? it._id ?? it.id}
-                className="py-5 flex items-center gap-4"
-              >
-                <img
-                  src={it.image || "/no-image.jpg"}
-                  alt={it.title}
-                  className="h-20 w-20 rounded object-cover border"
-                />
-                <div className="flex-1">
-                  <div className="font-medium">{it.title}</div>
-                  <div className="text-sm text-zinc-600">
-                    Price: ₹{Number(it.price).toFixed(2)}
+            {items.map((it) => {
+              // build proper image URL from either `image` or `images[0].url`
+              const imgUrl = buildImageUrl(
+                it.image || it.images?.[0]?.url
+              );
+              const lineTotal =
+                (Number(it.qty) || 1) * (Number(it.price) || 0);
+
+              return (
+                <li
+                  key={it.productId ?? it._id ?? it.id}
+                  className="py-5 flex items-center gap-4"
+                >
+                  <img
+                    src={imgUrl}
+                    alt={it.title}
+                    className="h-20 w-20 rounded object-cover border"
+                  />
+                  <div className="flex-1">
+                    <div className="font-medium">{it.title}</div>
+                    <div className="text-sm text-zinc-600">
+                      Price: ₹{Number(it.price).toFixed(2)}
+                    </div>
+                    <div className="text-xs text-zinc-500">
+                      Qty: {Number(it.qty) || 1}
+                    </div>
                   </div>
-                  <div className="text-xs text-zinc-500">
-                    Qty: {Number(it.qty) || 1}
+                  <div className="text-right font-semibold">
+                    ₹{lineTotal.toFixed(2)}
                   </div>
-                </div>
-                <div className="text-right font-semibold">
-                  ₹{(Number(it.qty) * Number(it.price)).toFixed(2)}
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
 
           <div className="mt-6 border-t pt-4">
