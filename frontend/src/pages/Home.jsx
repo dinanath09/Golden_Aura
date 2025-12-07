@@ -1,3 +1,4 @@
+// src/pages/Home.jsx
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -7,7 +8,7 @@ import aboutBottle from "../assets/about-bottle.JPG";
 
 const heroBg = new URL("../assets/hero-bottle.jpeg", import.meta.url).href;
 
-// ---------------- IMAGE URL FIX ----------------
+// ------------ API base + image URL helper -------------
 const RAW = (import.meta.env.VITE_API_URL || "http://localhost:5000").trim();
 const API_BASE = RAW.replace(/\/+$/, "");
 
@@ -16,19 +17,19 @@ function buildImageUrl(raw) {
 
   let url = String(raw).trim();
 
-  // 1️⃣ Fix old localhost URLs stored in MongoDB
+  // 1) Fix URLs saved with localhost in DB
   if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(url)) {
     const path = url.replace(/^https?:\/\/[^/]+/i, "");
     return `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
   }
 
-  // 2️⃣ Already absolute URL
+  // 2) Already an absolute http/https URL
   if (/^https?:\/\//i.test(url)) return url;
 
-  // 3️⃣ Relative path → attach backend URL
+  // 3) Relative path -> attach backend base
   return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
 }
-// -------------------------------------------------
+// ------------------------------------------------------
 
 export default function Home() {
   const [featured, setFeatured] = useState([]);
@@ -62,7 +63,6 @@ export default function Home() {
 
   return (
     <div className="space-y-16">
-
       {/* HERO SECTION */}
       <section className="relative w-full">
         <div
@@ -156,12 +156,11 @@ export default function Home() {
           </div>
         </div>
       </section>
-
     </div>
   );
 }
 
-/* ---------------- Section Wrapper ---------------- */
+/* --- Reusable Section Wrapper --- */
 function Section({ title, children }) {
   return (
     <section className="rounded-[24px] border bg-white p-6 sm:p-8">
@@ -171,7 +170,7 @@ function Section({ title, children }) {
   );
 }
 
-/* ---------------- Product Card ---------------- */
+/* --- Product Card With Wishlist + Auth-aware buttons --- */
 function ProductMini({ p }) {
   const [wishLoading, setWishLoading] = useState(false);
   const [inWishlist, setInWishlist] = useState(false);
@@ -183,51 +182,74 @@ function ProductMini({ p }) {
   const imgUrl = buildImageUrl(p.images?.[0]?.url);
   const link = `/products/${p._id}`;
 
-  // Load wishlist
+  /* LOAD WISHLIST STATUS ONLY IF LOGGED IN  */
   useEffect(() => {
+    if (!isLoggedIn) return; // avoid 401 spam when logged out
     (async () => {
       try {
         const { data } = await api.get("/wishlist");
         const ids = (data?.products || []).map((x) => x._id);
         setInWishlist(ids.includes(p._id));
-      } catch (err) {}
+      } catch (err) {
+        console.error("Wishlist preload error", err);
+      }
     })();
-  }, [p._id]);
+  }, [p._id, isLoggedIn]);
 
+  /* TOGGLE WISHLIST */
   const toggleWishlist = async (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (wishLoading) return;
 
+    if (!isLoggedIn) {
+      alert("Please log in to use wishlist.");
+      return;
+    }
+
     try {
       setWishLoading(true);
 
       if (inWishlist) {
-        await api.delete(`/wishlist/${p._id}`);
+        const res = await api.delete(`/wishlist/${p._id}`);
+        console.log("Removed from wishlist:", res?.data);
         setInWishlist(false);
       } else {
-        await api.post("/wishlist", { productId: p._id });
+        const res = await api.post("/wishlist", { productId: p._id });
+        console.log("Added to wishlist:", res?.data);
         setInWishlist(true);
       }
     } catch (err) {
-      alert("Please log in to use wishlist.");
+      console.error("Wishlist toggle error", err);
+      alert(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Could not update wishlist"
+      );
     } finally {
       setWishLoading(false);
     }
   };
 
+  /* ADD TO CART (login required) */
   const handleAddToCart = (e) => {
     e.preventDefault();
+
+    const target = link;
+
     if (!isLoggedIn) {
-      const redirect = encodeURIComponent(link);
+      const redirect = encodeURIComponent(target);
       navigate(`/login?redirect=${redirect}`);
       return;
     }
-    navigate(link);
+
+    navigate(target);
   };
 
+  /* BUY NOW (login required) */
   const handleBuyNow = (e) => {
     e.preventDefault();
+
     const target = `${link}?buy=1`;
 
     if (!isLoggedIn) {
@@ -235,6 +257,7 @@ function ProductMini({ p }) {
       navigate(`/login?redirect=${redirect}`);
       return;
     }
+
     navigate(target);
   };
 
@@ -243,13 +266,24 @@ function ProductMini({ p }) {
       <div className="relative">
         <Link to={link}>
           <div className="aspect-[4/5] bg-[#f7f5f1] overflow-hidden">
-            <img src={imgUrl} alt={p.title} className="w-full h-full object-cover" />
+            <img
+              src={imgUrl}
+              alt={p.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // strong fallback in case URL is bad
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/no-image.jpg";
+              }}
+            />
           </div>
         </Link>
 
         <button
           onClick={toggleWishlist}
           className="absolute top-3 right-3 bg-white/90 rounded-full p-1.5 shadow-sm hover:bg-white"
+          aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
+          disabled={wishLoading}
         >
           <span className={inWishlist ? "text-red-500" : "text-zinc-400"}>
             {inWishlist ? "♥" : "♡"}
@@ -258,7 +292,10 @@ function ProductMini({ p }) {
       </div>
 
       <div className="p-4 space-y-1">
-        <Link to={link} className="text-lg font-medium hover:underline inline-block">
+        <Link
+          to={link}
+          className="text-lg font-medium hover:underline inline-block"
+        >
           {p.title}
         </Link>
 
@@ -271,14 +308,14 @@ function ProductMini({ p }) {
         <div className="flex gap-2 mt-3">
           <button
             onClick={handleAddToCart}
-            className="flex-1 px-3 py-2 rounded-md bg-black text-white text-sm hover:bg-zinc-900"
+            className="flex-1 px-3 py-2 rounded-md bg-black text-white text-sm text-center hover:bg-zinc-900"
           >
             Add to Cart
           </button>
 
           <button
             onClick={handleBuyNow}
-            className="flex-1 px-3 py-2 rounded-md border text-sm hover:bg-zinc-50"
+            className="flex-1 px-3 py-2 rounded-md border text-sm text-center hover:bg-zinc-50"
           >
             Buy Now
           </button>
@@ -288,7 +325,7 @@ function ProductMini({ p }) {
   );
 }
 
-/* ---------------- Skeleton Loader ---------------- */
+/* --- Skeleton Loader --- */
 function SkeletonProduct() {
   return (
     <div className="rounded-2xl border bg-white overflow-hidden animate-pulse">
