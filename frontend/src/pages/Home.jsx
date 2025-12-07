@@ -1,4 +1,3 @@
-// src/pages/Home.jsx
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
@@ -8,14 +7,28 @@ import aboutBottle from "../assets/about-bottle.JPG";
 
 const heroBg = new URL("../assets/hero-bottle.jpeg", import.meta.url).href;
 
+// ---------------- IMAGE URL FIX ----------------
 const RAW = (import.meta.env.VITE_API_URL || "http://localhost:5000").trim();
 const API_BASE = RAW.replace(/\/+$/, "");
 
-function buildImageUrl(url) {
-  if (!url) return "/no-image.jpg";
+function buildImageUrl(raw) {
+  if (!raw) return "/no-image.jpg";
+
+  let url = String(raw).trim();
+
+  // 1️⃣ Fix old localhost URLs stored in MongoDB
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(url)) {
+    const path = url.replace(/^https?:\/\/[^/]+/i, "");
+    return `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+  }
+
+  // 2️⃣ Already absolute URL
   if (/^https?:\/\//i.test(url)) return url;
+
+  // 3️⃣ Relative path → attach backend URL
   return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
 }
+// -------------------------------------------------
 
 export default function Home() {
   const [featured, setFeatured] = useState([]);
@@ -49,6 +62,7 @@ export default function Home() {
 
   return (
     <div className="space-y-16">
+
       {/* HERO SECTION */}
       <section className="relative w-full">
         <div
@@ -142,11 +156,12 @@ export default function Home() {
           </div>
         </div>
       </section>
+
     </div>
   );
 }
 
-/* --- Reusable Section Wrapper --- */
+/* ---------------- Section Wrapper ---------------- */
 function Section({ title, children }) {
   return (
     <section className="rounded-[24px] border bg-white p-6 sm:p-8">
@@ -156,7 +171,7 @@ function Section({ title, children }) {
   );
 }
 
-/* --- Product Card With Wishlist + Auth-aware buttons --- */
+/* ---------------- Product Card ---------------- */
 function ProductMini({ p }) {
   const [wishLoading, setWishLoading] = useState(false);
   const [inWishlist, setInWishlist] = useState(false);
@@ -168,20 +183,17 @@ function ProductMini({ p }) {
   const imgUrl = buildImageUrl(p.images?.[0]?.url);
   const link = `/products/${p._id}`;
 
-  /* LOAD WISHLIST STATUS ON PAGE LOAD */
+  // Load wishlist
   useEffect(() => {
     (async () => {
       try {
         const { data } = await api.get("/wishlist");
         const ids = (data?.products || []).map((x) => x._id);
         setInWishlist(ids.includes(p._id));
-      } catch (err) {
-        console.error("Wishlist preload error", err);
-      }
+      } catch (err) {}
     })();
   }, [p._id]);
 
-  /* TOGGLE WISHLIST */
   const toggleWishlist = async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -191,49 +203,31 @@ function ProductMini({ p }) {
       setWishLoading(true);
 
       if (inWishlist) {
-        const res = await api.delete(`/wishlist/${p._id}`);
-        console.log("Removed from wishlist:", res?.data);
+        await api.delete(`/wishlist/${p._id}`);
         setInWishlist(false);
       } else {
-        const res = await api.post("/wishlist", { productId: p._id });
-        console.log("Added to wishlist:", res?.data);
+        await api.post("/wishlist", { productId: p._id });
         setInWishlist(true);
       }
     } catch (err) {
-      console.error("Wishlist toggle error", err);
-      if (err?.response?.status === 401) {
-        alert("Please log in to use wishlist.");
-      } else {
-        alert(
-          err?.response?.data?.message ||
-            err?.message ||
-            "Could not update wishlist"
-        );
-      }
+      alert("Please log in to use wishlist.");
     } finally {
       setWishLoading(false);
     }
   };
 
-  /* ADD TO CART (login required) */
   const handleAddToCart = (e) => {
     e.preventDefault();
-
-    const target = link; // /products/:id
-
     if (!isLoggedIn) {
-      const redirect = encodeURIComponent(target);
+      const redirect = encodeURIComponent(link);
       navigate(`/login?redirect=${redirect}`);
       return;
     }
-
-    navigate(target);
+    navigate(link);
   };
 
-  /* BUY NOW (login required) */
   const handleBuyNow = (e) => {
     e.preventDefault();
-
     const target = `${link}?buy=1`;
 
     if (!isLoggedIn) {
@@ -241,7 +235,6 @@ function ProductMini({ p }) {
       navigate(`/login?redirect=${redirect}`);
       return;
     }
-
     navigate(target);
   };
 
@@ -250,19 +243,13 @@ function ProductMini({ p }) {
       <div className="relative">
         <Link to={link}>
           <div className="aspect-[4/5] bg-[#f7f5f1] overflow-hidden">
-            <img
-              src={imgUrl}
-              alt={p.title}
-              className="w-full h-full object-cover"
-            />
+            <img src={imgUrl} alt={p.title} className="w-full h-full object-cover" />
           </div>
         </Link>
 
         <button
           onClick={toggleWishlist}
           className="absolute top-3 right-3 bg-white/90 rounded-full p-1.5 shadow-sm hover:bg-white"
-          aria-label={inWishlist ? "Remove from wishlist" : "Add to wishlist"}
-          disabled={wishLoading}
         >
           <span className={inWishlist ? "text-red-500" : "text-zinc-400"}>
             {inWishlist ? "♥" : "♡"}
@@ -271,10 +258,7 @@ function ProductMini({ p }) {
       </div>
 
       <div className="p-4 space-y-1">
-        <Link
-          to={link}
-          className="text-lg font-medium hover:underline inline-block"
-        >
+        <Link to={link} className="text-lg font-medium hover:underline inline-block">
           {p.title}
         </Link>
 
@@ -287,14 +271,14 @@ function ProductMini({ p }) {
         <div className="flex gap-2 mt-3">
           <button
             onClick={handleAddToCart}
-            className="flex-1 px-3 py-2 rounded-md bg-black text-white text-sm text-center hover:bg-zinc-900"
+            className="flex-1 px-3 py-2 rounded-md bg-black text-white text-sm hover:bg-zinc-900"
           >
             Add to Cart
           </button>
 
           <button
             onClick={handleBuyNow}
-            className="flex-1 px-3 py-2 rounded-md border text-sm text-center hover:bg-zinc-50"
+            className="flex-1 px-3 py-2 rounded-md border text-sm hover:bg-zinc-50"
           >
             Buy Now
           </button>
@@ -304,7 +288,7 @@ function ProductMini({ p }) {
   );
 }
 
-/* --- Skeleton Loader --- */
+/* ---------------- Skeleton Loader ---------------- */
 function SkeletonProduct() {
   return (
     <div className="rounded-2xl border bg-white overflow-hidden animate-pulse">
