@@ -11,29 +11,43 @@ const heroBg = new URL("../assets/hero-bottle.jpeg", import.meta.url).href;
 const RAW = (import.meta.env.VITE_API_URL || "http://localhost:5000").trim();
 const API_BASE = RAW.replace(/\/+$/, "");
 
-// --- FIXED: handles localhost URLs, absolute URLs and relative paths ---
+// --- SMART IMAGE URL NORMALISER ---
 function buildImageUrl(raw) {
   if (!raw) return "/no-image.jpg";
 
-  // If it's an absolute URL
-  if (/^https?:\/\//i.test(raw)) {
-    try {
-      const u = new URL(raw);
+  // If array or object, try to extract a URL-ish string
+  let url = raw;
+  if (Array.isArray(url)) url = url[0];
+  if (url && typeof url === "object") {
+    url = url.url || url.path || url.secure_url || url.location || "";
+  }
+  if (!url || typeof url !== "string") return "/no-image.jpg";
 
-      // If it points to localhost (saved from dev), replace origin with API_BASE
+  // If starts with http://, upgrade to https:// (fix mixed-content)
+  if (url.startsWith("http://")) {
+    url = "https://" + url.slice("http://".length);
+  }
+
+  // Absolute URL?
+  if (/^https?:\/\//i.test(url)) {
+    try {
+      const u = new URL(url);
+
+      // If it was saved with localhost, map to our API_BASE host
       if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
-        return `${API_BASE}${u.pathname}`;
+        const api = new URL(API_BASE);
+        return `${api.origin}${u.pathname}`;
       }
 
-      // Already a correct external URL (e.g. Cloudinary)
-      return raw;
+      // e.g. https://golden-aura.onrender.com/uploads/...
+      return url;
     } catch {
-      // fall through and treat as relative if parsing fails
+      // fall through and treat as relative
     }
   }
 
-  // Relative path from DB: "uploads/..." or "/uploads/..."
-  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  // Relative path like "uploads/..." or "/uploads/..."
+  const path = url.startsWith("/") ? url : `/${url}`;
   return `${API_BASE}${path}`;
 }
 
@@ -185,7 +199,7 @@ function ProductMini({ p }) {
   const { user } = useAuth();
   const isLoggedIn = !!user;
 
-  const imgUrl = buildImageUrl(p.images?.[0]?.url);
+  const imgUrl = buildImageUrl(p.images?.[0]?.url || p.images?.[0] || p.image);
   const link = `/products/${p._id}`;
 
   /* LOAD WISHLIST STATUS ON PAGE LOAD */
