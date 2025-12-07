@@ -58,26 +58,6 @@ export default function Register() {
   });
 
   // ---------- field handlers ----------
-  const onChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    if (name === "name") {
-      // remove disallowed characters immediately
-      const cleaned = nameClean(value);
-      setForm((s) => ({ ...s, name: cleaned }));
-      setErrors((prev) => ({ ...prev, name: validateField("name", cleaned) }));
-      return;
-    }
-    if (name === "agree") {
-      setForm((s) => ({ ...s, agree: checked }));
-      setErrors((prev) => ({ ...prev, agree: validateField("agree", checked) }));
-      return;
-    }
-
-    setForm((s) => ({ ...s, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
-    setMsg("");
-  };
-
   const validateField = (field, value) => {
     value = value ?? "";
     switch (field) {
@@ -109,6 +89,25 @@ export default function Register() {
       default:
         return "";
     }
+  };
+
+  const onChange = (e) => {
+    const { name, value, checked } = e.target;
+    if (name === "name") {
+      const cleaned = nameClean(value);
+      setForm((s) => ({ ...s, name: cleaned }));
+      setErrors((prev) => ({ ...prev, name: validateField("name", cleaned) }));
+      return;
+    }
+    if (name === "agree") {
+      setForm((s) => ({ ...s, agree: checked }));
+      setErrors((prev) => ({ ...prev, agree: validateField("agree", checked) }));
+      return;
+    }
+
+    setForm((s) => ({ ...s, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
+    setMsg("");
   };
 
   const validateAll = () => {
@@ -174,7 +173,8 @@ export default function Register() {
       >
         <h1 className="text-3xl font-bold text-center">
           Join <span className="text-amber-600">Golden Aura</span>
-    
+        </h1>
+
         {/* Name */}
         <div>
           <input
@@ -214,7 +214,6 @@ export default function Register() {
             placeholder="Mobile Number (10 digits)"
             value={form.mobile}
             onChange={(e) => {
-              // allow only digits while typing
               const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
               setForm((s) => ({ ...s, mobile: digits }));
               setErrors((prev) => ({ ...prev, mobile: validateField("mobile", digits) }));
@@ -249,7 +248,9 @@ export default function Register() {
 
           <div className="mt-2 h-1 w-full bg-zinc-100 rounded">
             <div
-              className={`h-1 rounded ${strength <= 2 ? "bg-red-400" : strength === 3 ? "bg-yellow-400" : "bg-green-500"}`}
+              className={`h-1 rounded ${
+                strength <= 2 ? "bg-red-400" : strength === 3 ? "bg-yellow-400" : "bg-green-500"
+              }`}
               style={{ width: `${(strength / 5) * 100}%` }}
             />
           </div>
@@ -307,7 +308,11 @@ export default function Register() {
           {loading ? "Creating…" : "Create Account"}
         </button>
 
-        {msg && <p className={`text-sm text-center ${msg.startsWith("✅") ? "text-green-600" : "text-red-600"}`}>{msg}</p>}
+        {msg && (
+          <p className={`text-sm text-center ${msg.startsWith("✅") ? "text-green-600" : "text-red-600"}`}>
+            {msg}
+          </p>
+        )}
 
         <p className="text-sm text-center text-zinc-600">
           Already have an account?{" "}
