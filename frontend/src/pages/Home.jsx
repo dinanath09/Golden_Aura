@@ -11,44 +11,10 @@ const heroBg = new URL("../assets/hero-bottle.jpeg", import.meta.url).href;
 const RAW = (import.meta.env.VITE_API_URL || "http://localhost:5000").trim();
 const API_BASE = RAW.replace(/\/+$/, "");
 
-// --- SMART IMAGE URL NORMALISER ---
-function buildImageUrl(raw) {
-  if (!raw) return "/no-image.jpg";
-
-  // If array or object, try to extract a URL-ish string
-  let url = raw;
-  if (Array.isArray(url)) url = url[0];
-  if (url && typeof url === "object") {
-    url = url.url || url.path || url.secure_url || url.location || "";
-  }
-  if (!url || typeof url !== "string") return "/no-image.jpg";
-
-  // If starts with http://, upgrade to https:// (fix mixed-content)
-  if (url.startsWith("http://")) {
-    url = "https://" + url.slice("http://".length);
-  }
-
-  // Absolute URL?
-  if (/^https?:\/\//i.test(url)) {
-    try {
-      const u = new URL(url);
-
-      // If it was saved with localhost, map to our API_BASE host
-      if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
-        const api = new URL(API_BASE);
-        return `${api.origin}${u.pathname}`;
-      }
-
-      // e.g. https://golden-aura.onrender.com/uploads/...
-      return url;
-    } catch {
-      // fall through and treat as relative
-    }
-  }
-
-  // Relative path like "uploads/..." or "/uploads/..."
-  const path = url.startsWith("/") ? url : `/${url}`;
-  return `${API_BASE}${path}`;
+function buildImageUrl(url) {
+  if (!url) return "/no-image.jpg";
+  if (/^https?:\/\//i.test(url)) return url;
+  return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
 }
 
 export default function Home() {
@@ -199,7 +165,7 @@ function ProductMini({ p }) {
   const { user } = useAuth();
   const isLoggedIn = !!user;
 
-  const imgUrl = buildImageUrl(p.images?.[0]?.url || p.images?.[0] || p.image);
+  const imgUrl = buildImageUrl(p.images?.[0]?.url);
   const link = `/products/${p._id}`;
 
   /* LOAD WISHLIST STATUS ON PAGE LOAD */
