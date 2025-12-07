@@ -8,28 +8,50 @@ import aboutBottle from "../assets/about-bottle.JPG";
 
 const heroBg = new URL("../assets/hero-bottle.jpeg", import.meta.url).href;
 
-// ------------ API base + image URL helper -------------
+// ---- API base + robust image resolver ----
 const RAW = (import.meta.env.VITE_API_URL || "http://localhost:5000").trim();
 const API_BASE = RAW.replace(/\/+$/, "");
 
-function buildImageUrl(raw) {
+/**
+ * Accepts whatever is in product.images and tries very hard
+ * to turn it into a working <img src="..."> URL.
+ *
+ * It supports:
+ * - array of strings
+ * - array of objects { url, path, secure_url, location }
+ * - single string
+ * - single object
+ */
+function resolveImage(raw) {
   if (!raw) return "/no-image.jpg";
 
-  let url = String(raw).trim();
+  let src = raw;
 
-  // 1) Fix URLs saved with localhost in DB
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(url)) {
-    const path = url.replace(/^https?:\/\/[^/]+/i, "");
-    return `${API_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+  // If it's an array (most common case: product.images)
+  if (Array.isArray(raw)) {
+    if (!raw.length) return "/no-image.jpg";
+    src = raw[0];
   }
 
-  // 2) Already an absolute http/https URL
-  if (/^https?:\/\//i.test(url)) return url;
+  // If it's an object, pull the interesting field out
+  if (src && typeof src === "object") {
+    src =
+      src.url ||
+      src.path ||
+      src.secure_url ||
+      src.location ||
+      src.key ||
+      null;
+  }
 
-  // 3) Relative path -> attach backend base
-  return `${API_BASE}${url.startsWith("/") ? url : `/${url}`}`;
+  if (!src || typeof src !== "string") return "/no-image.jpg";
+
+  // Already an absolute URL (Cloudinary, S3, etc.)
+  if (/^https?:\/\//i.test(src)) return src;
+
+  // Relative path coming from backend (/uploads/..., public/..., etc.)
+  return `${API_BASE}${src.startsWith("/") ? src : `/${src}`}`;
 }
-// ------------------------------------------------------
 
 export default function Home() {
   const [featured, setFeatured] = useState([]);
@@ -81,7 +103,8 @@ export default function Home() {
           </h1>
 
           <p className="mt-4 text-lg text-zinc-800 max-w-xl">
-            Curated perfumes for Men, Women and Unisex. A fragrance for every mood.
+            Curated perfumes for Men, Women and Unisex. A fragrance for every
+            mood.
           </p>
 
           <div className="mt-6 flex gap-3">
@@ -147,11 +170,14 @@ export default function Home() {
           </div>
 
           <div>
-            <h2 className="text-2xl font-serif font-bold mb-2">About the Brand</h2>
+            <h2 className="text-2xl font-serif font-bold mb-2">
+              About the Brand
+            </h2>
             <p className="text-zinc-700 leading-relaxed">
-              Golden Aura crafts sophisticated, unforgettable fragrances with a modern
-              Indian soul. Every bottle blends meticulous sourcing, artisanal balance,
-              and elegant presentation to elevate your daily ritual.
+              Golden Aura crafts sophisticated, unforgettable fragrances with a
+              modern Indian soul. Every bottle blends meticulous sourcing,
+              artisanal balance, and elegant presentation to elevate your daily
+              ritual.
             </p>
           </div>
         </div>
@@ -179,19 +205,26 @@ function ProductMini({ p }) {
   const { user } = useAuth();
   const isLoggedIn = !!user;
 
-  const imgUrl = buildImageUrl(p.images?.[0]?.url);
+  // ✅ use robust image resolver here
+  const imgUrl = resolveImage(p.images);
   const link = `/products/${p._id}`;
 
-  /* LOAD WISHLIST STATUS ONLY IF LOGGED IN  */
+  /* LOAD WISHLIST STATUS ON PAGE LOAD (only if logged in) */
   useEffect(() => {
-    if (!isLoggedIn) return; // avoid 401 spam when logged out
     (async () => {
       try {
+        if (!isLoggedIn) {
+          setInWishlist(false);
+          return;
+        }
         const { data } = await api.get("/wishlist");
         const ids = (data?.products || []).map((x) => x._id);
         setInWishlist(ids.includes(p._id));
       } catch (err) {
-        console.error("Wishlist preload error", err);
+        // 401 is normal if cookies are blocked on cross-origin, just ignore
+        if (err?.response?.status !== 401) {
+          console.error("Wishlist preload error", err);
+        }
       }
     })();
   }, [p._id, isLoggedIn]);
@@ -235,7 +268,7 @@ function ProductMini({ p }) {
   const handleAddToCart = (e) => {
     e.preventDefault();
 
-    const target = link;
+    const target = link; // /products/:id
 
     if (!isLoggedIn) {
       const redirect = encodeURIComponent(target);
@@ -270,11 +303,6 @@ function ProductMini({ p }) {
               src={imgUrl}
               alt={p.title}
               className="w-full h-full object-cover"
-              onError={(e) => {
-                // strong fallback in case URL is bad
-                e.currentTarget.onerror = null;
-                e.currentTarget.src = "/no-image.jpg";
-              }}
             />
           </div>
         </Link>
