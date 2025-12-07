@@ -174,9 +174,7 @@ export default function Register() {
       >
         <h1 className="text-3xl font-bold text-center">
           Join <span className="text-amber-600">Golden Aura</span>
-        </h1>
-        {/* <p className="text-center text-sm text-zinc-600 mb-4">Discover your signature fragrance today.</p> */}
-
+    
         {/* Name */}
         <div>
           <input
